@@ -28,3 +28,5 @@ case class SetValue(key: String, value: String) extends Message
 case class DeleteValue(key: String) extends Message
 
 case class Ping() extends Message
+
+case class ClientAnswer(msg: String) extends Message
