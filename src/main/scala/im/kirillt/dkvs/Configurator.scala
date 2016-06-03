@@ -9,12 +9,12 @@ class Configurator(val NODE_NAME: String) {
   class HostPort(val host:String, val port:String)
   val SYSTEM_NAME = "dkvs"
   private val nodes = readHostPorts("dkvs")
-  val HOST_NAME = nodes(NODE_NAME).host
-  val PORT = nodes(NODE_NAME).port
-  val otherNodes = nodes - NODE_NAME
+  val HOST = nodes(NODE_NAME).host
+  val PORT = nodes(NODE_NAME).port.toInt
+  private val otherNodes = nodes - NODE_NAME
 
-  val config = {
-    val hostConf = ConfigFactory.parseString("akka.remote.netty.tcp.hostname=" + HOST_NAME)
+  val systemConfig = {
+    val hostConf = ConfigFactory.parseString("akka.remote.netty.tcp.hostname=" + HOST)
     val portConf = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + PORT)
     val regularConfig = ConfigFactory.load()
     hostConf.withFallback(portConf).withFallback(regularConfig)

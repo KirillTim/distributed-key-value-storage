@@ -2,7 +2,7 @@ package im.kirillt.dkvs.message
 
 import im.kirillt.dkvs.types.LogEntry
 
-trait Message
+sealed trait Message
 
 case class AppendEntry(term: Int, leaderId: Int, prevLogIndex: Int, prevLogTerm: Int,
                        entries: Seq[LogEntry], leaderCommit: Int) extends Message
