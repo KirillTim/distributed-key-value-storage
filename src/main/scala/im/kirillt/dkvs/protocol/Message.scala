@@ -15,6 +15,8 @@ trait Message {
   case class AppendEntry(term: Int, leaderId: Int, prevLogIndex: Int, prevLogTerm: Int,
                          entries: Seq[LogEntry], leaderCommit: Int) extends ExternalMessage
 
+  case object HeartBeatMessage extends ExternalMessage
+
   sealed trait AppendResponse extends ExternalMessage
   case class AppendRejected(term: Int) extends AppendResponse
   case class AppendSuccessful(term: Int, lastIndex: Int) extends AppendResponse

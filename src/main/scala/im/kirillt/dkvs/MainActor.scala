@@ -11,10 +11,22 @@ class MainActor extends Actor with LoggingFSM[RaftState, StateData]
   with Candidate with Follower with Leader {
 
   private val ElectionTimeoutTimerName = "election-timer"
+  private val HeartbeatTimeoutTimerName = "heartbeat-timer"
 
   var electionDeadline: Deadline = 0.seconds.fromNow
 
   when(Candidate)(candidateBehavior)
+  when(Follower)(followerBehavior)
+  when(Leader)(leaderBehavior)
+
+  def cancelHeartbeatTimeout(): Unit = {
+    cancelTimer(HeartbeatTimeoutTimerName)
+  }
+
+  def resetHeartbeatTimeout(): Unit = {
+    cancelTimer(HeartbeatTimeoutTimerName)
+    setTimer(HeartbeatTimeoutTimerName, HeartbeatTimeout, Configurator.heartbeatTimeout, repeat = true)
+  }
 
   def cancelElectionDeadline() {
     cancelTimer(ElectionTimeoutTimerName)

@@ -13,6 +13,26 @@ trait Follower {
       resetElectionDeadline()
       stay() using m
 
-    case
+    case Event(HeartBeatMessage, m: StateData) =>
+      resetHeartbeatTimeout()
+      stay() using m
+
+    case Event(msg: RequestVote, m : StateData) =>
+      if (m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm)) {
+        sender ! VoteForCandidate(m.term)
+        log.info("Vote for {}", msg.candidateName)
+      } else {
+        sender ! DeclineCandidate(m.term)
+        log.info("Reject candidate {]", msg.candidateName)
+      }
+      stay() using m
+
+    case Event(msg: VoteResponse, m: StateData) =>
+      //ignore
+      stay() using m
+
+    case Event(msg: ClientMessage, m : StateData) =>
+      log.info("get request form user")
+      stay() using m
   }
 }
