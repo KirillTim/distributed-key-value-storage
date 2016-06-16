@@ -9,7 +9,8 @@ class NodeReference(val actor: ActorSelection, val name: String, var alive: Bool
 
 class Self(val actor: ActorRef, val name:String)
 
-class StateData(val self: Self, val remoteNodes: Seq[NodeReference]) {
+class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReference]) {
+  val self = new Self(actor, name)
   val log = ReplicateLog.empty()
   var leader: Option[ActorSelection] = None
   var term = 1
@@ -26,7 +27,7 @@ class StateData(val self: Self, val remoteNodes: Seq[NodeReference]) {
   }
 
   def canVoteFor(lastLogIndex: Int, lastLogTerm: Int) = voteForOnThisTerm match {
-      case Some(name) => false
+      case Some(node) => false
       case _ => log.atLeastAsUpToDateAsMe(lastLogIndex, lastLogTerm)
     }
 

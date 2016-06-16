@@ -3,11 +3,12 @@ package im.kirillt.dkvs
 import akka.actor.{Actor, LoggingFSM}
 import protocol._
 
+
 import scala.concurrent.duration._
 import scala.concurrent.forkjoin.ThreadLocalRandom
 
 
-class MainActor extends Actor with LoggingFSM[RaftState, StateData]
+class MainActor(val config: Configurator, val otherNodes:List[NodeReference]) extends Actor with LoggingFSM[RaftState, StateData]
   with Candidate with Follower with Leader {
 
   private val ElectionTimeoutTimerName = "election-timer"
@@ -18,6 +19,22 @@ class MainActor extends Actor with LoggingFSM[RaftState, StateData]
   when(Candidate)(candidateBehavior)
   when(Follower)(followerBehavior)
   when(Leader)(leaderBehavior)
+
+  startWith(Follower, new StateData(self, config.NODE_NAME, otherNodes))
+
+  onTransition {
+    case Follower -> Candidate => {
+      log.info("Follower -> Candidate")
+    }
+    case Candidate -> Leader => {
+      log.info("Candidate -> Leader")
+    }
+    case Candidate -> Follower => {
+      log.info("Candidate -> Follower")
+    }
+  }
+
+  initialize()
 
   def cancelHeartbeatTimeout(): Unit = {
     cancelTimer(HeartbeatTimeoutTimerName)
