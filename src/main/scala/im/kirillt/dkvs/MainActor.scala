@@ -1,47 +1,43 @@
 package im.kirillt.dkvs
 
-import akka.actor.{Actor, ActorRef}
-import im.kirillt.dkvs.message.Ping
+import akka.actor.{Actor, LoggingFSM}
+import protocol._
+
+import scala.concurrent.duration._
+import scala.concurrent.forkjoin.ThreadLocalRandom
 
 
-class MainActor extends Actor {
-  var count = 0
+class MainActor extends Actor with LoggingFSM[RaftState, StateData]
+  with Candidate with Follower with Leader {
 
-  def sendMsg(message: Any, receiver: ActorRef) = {
-    receiver ! message
+  private val ElectionTimeoutTimerName = "election-timer"
+
+  var electionDeadline: Deadline = 0.seconds.fromNow
+
+  when(Candidate)(candidateBehavior)
+
+  def cancelElectionDeadline() {
+    cancelTimer(ElectionTimeoutTimerName)
   }
 
-  override def receive: Receive = {
-    case Ping =>
-      println("get ping message from " + sender.path + " adrr: "+sender.path.address)
-      if (count == 5)
-        println("finished")
-      else {
-        count += 1
-        println(s"count = $count")
-        sender ! Ping
-      }
-    case msg: String =>
-
-      println(s"get plane string message: $msg from " + sender.path + " adrr: "+sender.path.address)
-      if (count == 5)
-        println("finished")
-      else {
-        count += 1
-        println(s"count = $count")
-        sender ! Ping
-      }
-    case _ =>
-
-      println(s"get unknown type message from " + sender.path + " adrr: "+sender.path.address)
-      if (count == 5)
-        println("finished")
-      else {
-        count += 1
-        println(s"count = $count")
-        sender ! Ping
-      }
+  def resetElectionDeadline(): Deadline = {
+    cancelTimer(ElectionTimeoutTimerName)
+    electionDeadline = nextElectionDeadline()
+    log.debug("Resetting election timeout: {}", electionDeadline)
+    setTimer(ElectionTimeoutTimerName, ElectionTimeout, electionDeadline.timeLeft, repeat = false)
+    electionDeadline
   }
 
+  def nextElectionDeadline(): Deadline = randomElectionTimeout(
+    Configurator.electionTimeoutMin,
+    Configurator.electionTimeoutMax
+  ).fromNow
 
+  private def randomElectionTimeout(from: FiniteDuration, to: FiniteDuration): FiniteDuration = {
+    val fromMs = from.toMillis
+    val toMs = to.toMillis
+    require(toMs > fromMs, s"to ($to) must be greater than from ($from) in order to create valid election timeout.")
+
+    (fromMs + ThreadLocalRandom.current().nextInt(toMs.toInt - fromMs.toInt)).millis
+  }
 }
