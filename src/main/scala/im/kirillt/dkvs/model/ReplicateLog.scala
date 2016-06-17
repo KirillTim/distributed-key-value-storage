@@ -1,8 +1,10 @@
 package im.kirillt.dkvs.model
 
+import im.kirillt.dkvs.protocol._
+
 import scala.collection.mutable.ArrayBuffer
 
-case class LogEntry(term: Int, key: String, value: String)
+case class LogEntry(index: Int, term: Int, key: String, value: String)
 
 class ReplicateLog(val entries: ArrayBuffer[LogEntry], var committedIndex: Int) {
   def lastEntryIndex = entries.length - 1
@@ -14,6 +16,12 @@ class ReplicateLog(val entries: ArrayBuffer[LogEntry], var committedIndex: Int) 
       return true
     lastLogIndex >= lastEntryIndex
   }
+
+  def removeNodesFrom(index:Int): Unit = {
+    while (entries.size > index)
+      entries.remove(index)
+  }
+
 }
 
 object ReplicateLog {

@@ -16,12 +16,17 @@ trait Follower {
       stay() using m
 
     case Event(msg: RequestVote, m: StateData) =>
-      if (m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm)) {
-        sender ! VoteForCandidate(m.term)
-        log.info("Vote for {}", msg.candidateName)
+      if (msg.term < m.currentTerm) {
+        sender ! DeclineCandidate(m.currentTerm)
       } else {
-        sender ! DeclineCandidate(m.term)
-        log.info("Reject candidate {]", msg.candidateName)
+        if (m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm)) {
+          m.voteForOnThisTerm = Some(msg.candidateName)
+          sender ! VoteForCandidate(m.currentTerm)
+          log.info("Vote for {}", msg.candidateName)
+        } else {
+          sender ! DeclineCandidate(m.currentTerm)
+          log.info("Reject candidate {]", msg.candidateName)
+        }
       }
       stay() using m
 

@@ -12,14 +12,16 @@ trait Leader {
 
     case Event(HeartbeatTimeout, m : StateData) =>
       System.err.println("Leader: HeartbeatTimeout")
-      m.remoteNodes.foreach(_.actor ! AppendEntry(m.term, m.self.name, m.log.lastEntryIndex, m.log.lastEntryTerm, List(), 0))
+      m.remoteNodes.foreach(_.actor ! AppendEntry(m.currentTerm, m.self.name, m.log.lastEntryIndex, m.log.lastEntryTerm, List(), 0))
       stay() using m
 
     case Event(msg: RequestVote, m:StateData) =>
-      sender ! AppendEntry(m.term, m.self.name, m.log.lastEntryIndex, m.log.lastEntryTerm, List(), 0)
+      sender ! AppendEntry(m.currentTerm, m.self.name, m.log.lastEntryIndex, m.log.lastEntryTerm, List(), 0)
       stay() using m
 
-    //case Event(msg: AppendEntry, m : StateData) if =>
+    case Event(msg: VoteResponse, m: StateData) =>
+      //ignore
+      stay() using m
 
     case Event(msg: ClientMessage, m :StateData) =>
       log.info("get request from user")

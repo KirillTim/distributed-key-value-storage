@@ -8,7 +8,7 @@ trait Candidate {
   val candidateBehavior: StateFunction = {
     //election
     case Event(BeginElection, m: StateData) =>
-      log.info("start new election in {} term", m.term)
+      log.info("start new election in {} term", m.currentTerm)
       resetElectionDeadline()
       m.remoteNodes.foreach(_.actor ! m.buildRequestVote())
       m.votesForMe += 1
@@ -28,25 +28,14 @@ trait Candidate {
     case Event(DeclineCandidate(term), m : StateData) =>
       stay() using m
 
-    // election response
-    /*case Event(msg : RequestVote, m : StateData) if msg.term < m.term =>
-      sender ! DeclineCandidate(m.term)
-      stay() using m
-
-    case Event(msg: RequestVote, m : StateData) if m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm) =>
-      sender ! VoteForCandidate(m.term)
-      m.voteForOnThisTerm = Some(msg.candidateName)
-      stay() using m*/
-
     case Event(msg: RequestVote, m: StateData) =>
-      sender ! DeclineCandidate(m.term)
+      sender ! DeclineCandidate(m.currentTerm)
       stay() using m
 
     case Event(msg: AppendEntry, m : StateData) =>
       System.err.println("Candidate: get message from leader")
       resetElectionDeadline()
       goto(Follower) using m
-
 
     case Event(msg: ClientMessage, m :StateData) =>
       stay() using m
