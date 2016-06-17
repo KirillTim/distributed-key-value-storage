@@ -1,20 +1,57 @@
 package im.kirillt.dkvs
 
+import akka.actor.Actor.Receive
+import akka.actor.{Actor, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
+import im.kirillt.dkvs.protocol._
+import im.kirillt.dkvs.protocol.NodeReference
 
 import scala.collection.mutable
-import scala.concurrent.duration.{FiniteDuration, SECONDS}
+
+object Client extends App {
+
+  val configurator = new ClientConfig("127.0.0.1", "9000")
+  val system = ActorSystem(configurator.SYSTEM_NAME, configurator.systemConfig)
+  val nodes = configurator.allActorsPaths
+    .map(path => (path._1, system.actorSelection(path._2)))
+
+  val clientActor = system.actorOf(Props[ClientActor], "client")
+
+  println("Nodes:")
+  for (i <- nodes.keys) {
+    println(i)
+  }
+
+  while (true) {
+    println("Enter command")
+    val command = readLine().toLowerCase()
+    val cmd = command.split(' ')
+    if (cmd(0).equals("exit"))
+      sys.exit(1)
+    if (cmd(0).equals("ping")) {
+      nodes(cmd(1)).tell(Ping, clientActor)
+    }
+
+  }
+}
+
+class ClientActor extends Actor {
+  override def receive: Receive = {
+    case (msg: ClientAnswer) =>
+      println(msg.msg)
+    case _ =>
+      println("Unknown incoming message")
+  }
+}
 
 
-class Configurator(val NODE_NAME: String) {
+class ClientConfig(val HOST: String, val PORT: String) {
   type NodeName = String
+
   private class HostPort(val host: String, val port: String)
 
   val SYSTEM_NAME = "dkvs"
   private val nodes = readHostPorts(SYSTEM_NAME)
-  val HOST = nodes(NODE_NAME).host
-  val PORT = nodes(NODE_NAME).port.toInt
-  private val otherNodes = nodes - NODE_NAME
 
   val systemConfig = {
     val hostConf = ConfigFactory.parseString("akka.remote.netty.tcp.hostname=" + HOST)
@@ -24,7 +61,6 @@ class Configurator(val NODE_NAME: String) {
   }
 
 
-  val otherActorsPaths = otherNodes.map(node => (node._1, getPath(node._1, node._2)))
   val allActorsPaths = nodes.map(node => (node._1, getPath(node._1, node._2)))
 
   private def getPath(name: NodeName, node: HostPort) = s"akka.tcp://$SYSTEM_NAME@${node.host}:${node.port}/user/$name"
@@ -41,10 +77,4 @@ class Configurator(val NODE_NAME: String) {
     }
     data.toMap
   }
-}
-
-object Configurator {
-  val electionTimeoutMin = FiniteDuration(5, SECONDS)
-  val electionTimeoutMax = FiniteDuration(10, SECONDS)
-  val heartbeatTimeout = electionTimeoutMin//FiniteDuration(3, SECONDS)
 }

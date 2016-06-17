@@ -1,7 +1,6 @@
 import im.kirillt.dkvs.model._
 import im.kirillt.dkvs.protocol._
 
-import scala.collection.mutable.ArrayBuffer
 
 object AppendEntriesTest {
   def main(args: Array[String]) {

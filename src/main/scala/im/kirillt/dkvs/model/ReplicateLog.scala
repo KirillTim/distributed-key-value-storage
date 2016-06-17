@@ -22,6 +22,8 @@ class ReplicateLog(val entries: ArrayBuffer[LogEntry], var committedIndex: Int) 
       entries.remove(index)
   }
 
+  def restFrom(index:Int) = entries.takeRight(entries.size - index)
+
 }
 
 object ReplicateLog {
