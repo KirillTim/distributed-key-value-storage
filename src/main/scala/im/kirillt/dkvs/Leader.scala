@@ -43,7 +43,8 @@ trait Leader {
       stay() using m
 
     //client messages
-    case Event(Ping, m : StateData  ) =>
+
+    case Event(msg: Ping, m : StateData) =>
       sender ! ClientAnswer("Pong")
       stay() using m
 

@@ -29,7 +29,13 @@ object Client extends App {
     if (cmd(0).equals("exit"))
       sys.exit(1)
     if (cmd(0).equals("ping")) {
-      nodes(cmd(1)).tell(Ping, clientActor)
+      nodes(cmd(1)).tell(new Ping(), clientActor)
+    } else if (cmd(0).equals("get")) {
+      nodes(cmd(1)).tell(new GetValue(cmd(2)), clientActor)
+    } else if (cmd(0).equals("set")) {
+      nodes(cmd(1)).tell(new SetValue(cmd(2), cmd(3)), clientActor)
+    } else if (cmd(0).equals("delete")) {
+      nodes(cmd(1)).tell(new DeleteValue(cmd(2)), clientActor)
     }
 
   }

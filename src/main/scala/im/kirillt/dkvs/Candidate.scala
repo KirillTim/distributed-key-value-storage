@@ -16,10 +16,10 @@ trait Candidate {
       stay() using m
 
     case Event(VoteForCandidate(term), m: StateData) =>
-      if (term > m.currentTerm) {
+      /*if (term > m.currentTerm) {
         m.currentTerm = term
         goto(Follower) using m
-      } else {
+      } else {*/
         log.info("get vote for self")
         m.votesForMe += 1
         if (m.votesForMe >= m.remoteNodes.size / 2 + 1) {
@@ -28,24 +28,24 @@ trait Candidate {
         } else {
           stay() using m
         }
-      }
+      //}
 
     case Event(DeclineCandidate(term), m : StateData) =>
-      if (term > m.currentTerm) {
+      /*if (term > m.currentTerm) {
         m.currentTerm = term
         goto(Follower) using m
-      } else {
+      } else {*/
         stay() using m
-      }
+      //}
 
     case Event(msg: RequestVote, m: StateData) =>
-      if (msg.term > m.currentTerm) {
+      /*if (msg.term > m.currentTerm) {
         m.currentTerm = msg.term
         goto(Follower) using m
-      } else {
+      } else {*/
         sender ! DeclineCandidate(m.currentTerm)
         stay() using m
-      }
+      //}
 
     case Event(msg: AppendEntry, m : StateData) =>
       System.err.println("Candidate: get message from leader")
@@ -53,11 +53,21 @@ trait Candidate {
       resetElectionDeadline()
       goto(Follower) using m
 
-    case Event(Ping, m : StateData  ) =>
+
+    case Event(msg: Ping, m : StateData) =>
       sender ! ClientAnswer("Pong")
       stay() using m
 
-    case Event(msg: ClientMessage, m :StateData) =>
+
+    case Event(msg: SetValue, m :StateData) =>
+      sender ! ClientAnswer("Don't know who is a leader :(")
+      stay() using m
+
+    case Event(msg: GetValue, m :StateData) =>
+      sender ! ClientAnswer("Don't know who is a leader :(")
+      stay() using m
+
+    case Event(msg: DeleteValue, m :StateData) =>
       sender ! ClientAnswer("Don't know who is a leader :(")
       stay() using m
 

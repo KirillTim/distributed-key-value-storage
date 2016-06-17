@@ -41,12 +41,12 @@ trait Follower {
       //ignore
       stay() using m
 
-    case Event(Ping, m: StateData) =>
-      sender ! ClientAnswer("Pong")
-      stay() using m
-
     case Event(msg: ClientAnswer, m: StateData) =>
       msg.answerTo.get ! msg
+      stay() using m
+
+    case Event(msg: Ping, m : StateData) =>
+      sender ! ClientAnswer("Pong")
       stay() using m
 
     case Event(msg: SetValue, m: StateData) =>

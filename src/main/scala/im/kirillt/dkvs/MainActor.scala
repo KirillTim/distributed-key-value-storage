@@ -23,6 +23,7 @@ class MainActor(val config: Configurator, val otherNodes: List[NodeReference]) e
 
   startWith(Follower, new StateData(self, config.NODE_NAME, otherNodes))
 
+
   onTransition {
     case Follower -> Candidate => {
       System.err.println("Follower -> Candidate")

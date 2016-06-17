@@ -29,7 +29,7 @@ trait Messages {
   case class GetValue(key: String, answerTo: Option[ActorRef] = None) extends ClientMessage
   case class SetValue(key: String, value: String, answerTo: Option[ActorRef] = None) extends ClientMessage
   case class DeleteValue(key: String, answerTo: Option[ActorRef] = None) extends ClientMessage
-  case object Ping extends ClientMessage
+  case class Ping() extends ClientMessage
   case class ClientAnswer(msg: String, answerTo: Option[ActorRef] = None) extends ClientMessage
 
   case object BeginElection extends ElectionMessage
