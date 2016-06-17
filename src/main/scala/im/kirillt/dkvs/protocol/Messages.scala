@@ -2,7 +2,7 @@ package im.kirillt.dkvs.protocol
 
 import im.kirillt.dkvs.model.LogEntry
 
-trait Message {
+trait Messages {
 
   sealed trait Message
   sealed trait InternalMessage extends Message

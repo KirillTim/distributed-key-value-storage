@@ -47,12 +47,12 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   def tryToAppendEntries(msg: AppendEntry): Boolean = {
     if (msg.term < currentTerm)
       return false
-    if (msg.prevLogIndex < 0 || log.entries(msg.prevLogIndex).term != msg.prevLogTerm)
+    if (msg.prevLogIndex < 0 || msg.prevLogIndex > log.lastEntryIndex || log.entries(msg.prevLogIndex).term != msg.prevLogTerm)
       return false
     if (msg.entries.isEmpty)
       return true
     for (newEntry <- msg.entries) {
-      if (log.entries(newEntry.index).term != newEntry.term) {
+      if (newEntry.index < log.entries.size && log.entries(newEntry.index).term != newEntry.term) {
         log.removeNodesFrom(newEntry.index)
       }
       log.entries += newEntry
