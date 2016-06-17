@@ -12,10 +12,8 @@ trait Message {
   sealed trait ElectionMessage extends InternalMessage
   sealed trait LeaderMessage extends InternalMessage
 
-  case class AppendEntry(term: Int, leaderId: Int, prevLogIndex: Int, prevLogTerm: Int,
+  case class AppendEntry(term: Int, leaderId: String, prevLogIndex: Int, prevLogTerm: Int,
                          entries: Seq[LogEntry], leaderCommit: Int) extends ExternalMessage
-
-  case object HeartBeatMessage extends ExternalMessage
 
   sealed trait AppendResponse extends ExternalMessage
   case class AppendRejected(term: Int) extends AppendResponse
@@ -23,9 +21,9 @@ trait Message {
 
   case class RequestVote(term: Int, candidateName: String, lastLogIndex: Int, lastLogTerm: Int) extends ExternalMessage
 
-  abstract class VoteResponse(val term: Int) extends ExternalMessage
-  case class VoteForCandidate(myTerm: Int) extends VoteResponse(myTerm)
-  case class DeclineCandidate(myTerm: Int) extends VoteResponse(myTerm)
+  sealed trait VoteResponse extends ExternalMessage
+  case class VoteForCandidate(myTerm: Int) extends VoteResponse
+  case class DeclineCandidate(myTerm: Int) extends VoteResponse
 
   case class GetValue(key: String) extends ClientMessage
   case class SetValue(key: String, value: String) extends ClientMessage

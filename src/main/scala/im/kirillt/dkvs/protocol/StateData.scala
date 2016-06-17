@@ -31,5 +31,7 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
       case _ => log.atLeastAsUpToDateAsMe(lastLogIndex, lastLogTerm)
     }
 
+  def buildRequestVote() = RequestVote(term, self.name, log.lastEntryIndex, log.lastEntryTerm)
+
 }
 

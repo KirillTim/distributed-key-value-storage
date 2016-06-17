@@ -6,18 +6,16 @@ trait Follower {
   this: MainActor =>
   val followerBehavior: StateFunction = {
     case Event(ElectionTimeout, m: StateData) =>
+      cancelElectionDeadline()
       m.self.actor ! BeginElection
       goto(Candidate) using m
 
     case Event(newEntries: AppendEntry, m: StateData) =>
+      System.err.println("Follower: get message from leader")
       resetElectionDeadline()
       stay() using m
 
-    case Event(HeartBeatMessage, m: StateData) =>
-      resetHeartbeatTimeout()
-      stay() using m
-
-    case Event(msg: RequestVote, m : StateData) =>
+    case Event(msg: RequestVote, m: StateData) =>
       if (m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm)) {
         sender ! VoteForCandidate(m.term)
         log.info("Vote for {}", msg.candidateName)
@@ -31,7 +29,7 @@ trait Follower {
       //ignore
       stay() using m
 
-    case Event(msg: ClientMessage, m : StateData) =>
+    case Event(msg: ClientMessage, m: StateData) =>
       log.info("get request form user")
       stay() using m
   }

@@ -22,17 +22,32 @@ class MainActor(val config: Configurator, val otherNodes:List[NodeReference]) ex
 
   startWith(Follower, new StateData(self, config.NODE_NAME, otherNodes))
 
+  /*whenUnhandled {
+    case Event(msg:ExternalMessage, m:StateData) =>
+      System.err.println(s"get unhandled message ${msg.getClass.getSimpleName} in $stateName")
+      stay
+
+    case Event(msg:InternalMessage, m:StateData) =>
+      System.err.println(s"get unhandled message ${msg.getClass.getSimpleName} in $stateName")
+      stay
+  }*/
+
   onTransition {
     case Follower -> Candidate => {
+      System.err.println("Follower -> Candidate")
       log.info("Follower -> Candidate")
     }
     case Candidate -> Leader => {
+      System.err.println("Candidate -> Leader")
       log.info("Candidate -> Leader")
     }
     case Candidate -> Follower => {
+      System.err.println("Candidate -> Follower")
       log.info("Candidate -> Follower")
     }
   }
+
+  resetElectionDeadline()
 
   initialize()
 
