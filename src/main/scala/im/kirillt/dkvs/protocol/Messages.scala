@@ -13,18 +13,18 @@ trait Messages {
   sealed trait ElectionMessage extends InternalMessage
   sealed trait LeaderMessage extends InternalMessage
 
-  case class AppendEntry(term: Int, leaderId: String, prevLogIndex: Int, prevLogTerm: Int,
+  case class AppendEntry(term: Int, leaderName: String, prevLogIndex: Int, prevLogTerm: Int,
                          entries: Seq[LogEntry], leaderCommit: Int) extends ExternalMessage
 
   sealed trait AppendResponse extends ExternalMessage
-  case class AppendRejected(node: String, term: Int) extends AppendResponse
-  case class AppendSuccessful(node:String, term: Int, lastIndex: Int) extends AppendResponse
+  case class AppendRejected(nodeName: String, term: Int) extends AppendResponse
+  case class AppendSuccessful(nodeName: String, term: Int, lastIndex: Int) extends AppendResponse
 
   case class RequestVote(term: Int, candidateName: String, lastLogIndex: Int, lastLogTerm: Int) extends ExternalMessage
 
   sealed trait VoteResponse extends ExternalMessage
-  case class VoteForCandidate(myTerm: Int) extends VoteResponse
-  case class DeclineCandidate(myTerm: Int) extends VoteResponse
+  case class VoteForCandidate(term: Int) extends VoteResponse
+  case class DeclineCandidate(term: Int) extends VoteResponse
 
   case class GetValue(key: String, answerTo: Option[ActorRef] = None) extends ClientMessage
   case class SetValue(key: String, value: String, answerTo: Option[ActorRef] = None) extends ClientMessage

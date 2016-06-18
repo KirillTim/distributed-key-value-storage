@@ -1,9 +1,12 @@
 package im.kirillt.dkvs.protocol
 
+import java.io.PrintWriter
+
 import akka.actor.{ActorRef, ActorSelection}
 import im.kirillt.dkvs.model.{LogEntry, ReplicateLog}
 
 import scala.collection.mutable
+import scala.io.Source
 
 class NodeReference(val actor: ActorSelection, val name: String, var alive: Boolean = false)
 
@@ -12,13 +15,12 @@ class Self(val actor: ActorRef, val name: String)
 class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReference]) {
   val self = new Self(actor, name)
   val log = ReplicateLog.empty()
-  var leader: Option[ActorSelection] = None
+  var leader: Option[ActorRef] = None
   var currentTerm = 0
   val nextIndex = mutable.Map[String, Int]()
   val matchIndex = mutable.Map[String, Int]()
   var votesForMe = 0
-  var voteForOnThisTerm: Option[String] = None
-  var lastApplied = 0
+  var votedForOnThisTerm: Option[String] = None
 
   val storage = mutable.Map[String, String]()
 
@@ -38,31 +40,35 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   }
 
   def saveLog(meta: StateData): Unit = {
-
+    StateData.writeLog(meta)
   }
 
-  def nextTerm(): StateData = {
-    currentTerm += 1
-    voteForOnThisTerm = None
+  def newTerm(term: Int): StateData = {
+    currentTerm = term
+    votedForOnThisTerm = None
     votesForMe = 0
     this
   }
 
-  def canVoteFor(lastLogIndex: Int, lastLogTerm: Int) = voteForOnThisTerm match {
+  def nextTerm() = newTerm(currentTerm + 1)
+
+  def canVoteFor(lastLogIndex: Int, lastLogTerm: Int) = votedForOnThisTerm match {
     case Some(node) => false
     case _ => log.atLeastAsUpToDateAsMe(lastLogIndex, lastLogTerm)
   }
 
-  def buildRequestVote() = RequestVote(currentTerm, self.name, log.lastEntryIndex, log.lastEntryTerm)
+  def buildRequestVote() = new RequestVote(currentTerm, self.name, log.lastEntryIndex, log.lastEntryTerm)
 
   def becomeLeader(): StateData = {
+    votedForOnThisTerm = None
+    votesForMe = 0
+    leader = Some(self.actor)
     matchIndex.clear()
     nextIndex.clear()
     for (node <- remoteNodes) {
       matchIndex.put(node.name, -1)
       nextIndex.put(node.name, log.lastEntryIndex + 1)
     }
-
     this
   }
 
@@ -71,8 +77,6 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
       return false
     if (msg.prevLogIndex < 0 || msg.prevLogIndex > log.lastEntryIndex || log.entries(msg.prevLogIndex).term != msg.prevLogTerm)
       return false
-    if (msg.entries.isEmpty)
-      return true
     for (newEntry <- msg.entries) {
       if (newEntry.index < log.entries.size && log.entries(newEntry.index).term != newEntry.term) {
         log.removeNodesFrom(newEntry.index)
@@ -80,19 +84,51 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
       log.entries += newEntry
     }
     if (msg.leaderCommit > log.committedIndex)
-      log.committedIndex = Math.min(msg.leaderCommit, msg.entries.last.index)
+      log.committedIndex = Math.min(msg.leaderCommit, log.lastEntryIndex)
 
-    if (log.committedIndex > lastApplied) {
-      lastApplied = log.committedIndex
+    if (log.committedIndex > log.lastApplied) {
+      log.lastApplied = log.committedIndex
       updateData(this)
     }
 
     true
   }
 
-  def addEntry(key:String, value: String): Unit = {
-    log.entries += LogEntry(log.lastEntryIndex+1, currentTerm, key, value)
-    updateData(this)
+  def addEntry(key: String, value: String): Unit = {
+    log.entries += LogEntry(log.lastEntryIndex + 1, currentTerm, key, value)
   }
 }
 
+object StateData {
+  def tryInitFromLogs(actor: ActorRef, name: String, remote: Seq[NodeReference]): StateData = {
+    val result = new StateData(actor, name, remote)
+    if (!new java.io.File(s"$name.log").exists)
+      return result
+    val filename = s"$name.log"
+    for (line <- Source.fromFile(filename).getLines()) {
+      val record = line.split(" ")
+      if (record(3) == "EMPTY")
+        record(3) = null
+      val entry = LogEntry(record(0).toInt, record(1).toInt, record(2), record(3))
+      result.log.entries += entry
+    }
+    result.currentTerm = result.log.lastEntryTerm
+    result
+  }
+
+  def writeLog(meta: StateData): Unit = {
+    val filename = s"${meta.self.name}.log"
+    new PrintWriter(filename) {
+      for (entry <- meta.log.entries) {
+        var line = entry.index + " " + entry.term + " " + entry.key + " "
+        if (entry.value == null)
+          line += "EMPTY"
+        else
+          line += entry.value
+        write(line + "\n")
+      }
+      close()
+    }
+
+  }
+}
