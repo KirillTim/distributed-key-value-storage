@@ -21,8 +21,8 @@ class MainActor(val config: Configurator, val otherNodes: List[NodeReference]) e
   when(Follower)(followerBehavior)
   when(Leader)(leaderBehavior)
 
-  startWith(Follower, new StateData(self, config.NODE_NAME, otherNodes))
-
+  //startWith(Follower, new StateData(self, config.NODE_NAME, otherNodes))
+  startWith(Follower, StateData.tryInitFromLogs(self, config.NODE_NAME, otherNodes))
 
   onTransition {
     case Follower -> Candidate => {

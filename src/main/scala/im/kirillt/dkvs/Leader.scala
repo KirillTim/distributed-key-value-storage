@@ -1,9 +1,6 @@
 package im.kirillt.dkvs
 
-import im.kirillt.dkvs.model.LogEntry
 import im.kirillt.dkvs.protocol._
-
-import scala.collection.mutable.ArrayBuffer
 
 trait Leader {
   this: MainActor =>
@@ -15,7 +12,9 @@ trait Leader {
 
     case Event(HeartbeatTimeout, m: StateData) =>
       System.err.println("Leader: HeartbeatTimeout")
-      m.remoteNodes.foreach(_.actor ! AppendEntry(m.currentTerm, m.self.name, m.log.lastEntryIndex, m.log.lastEntryTerm, List(), 0))
+      m.remoteNodes.foreach((node: NodeReference) => {
+        node.actor ! m.buildAppendEntryFor(node.name)
+      })
       stay() using m
 
     case Event(msg: RequestVote, m: StateData) =>
@@ -23,20 +22,29 @@ trait Leader {
         m.currentTerm = msg.term
         goto(Follower) using m
       } else {
-        sender ! AppendEntry(m.currentTerm, m.self.name, m.log.lastEntryIndex, m.log.lastEntryTerm, List(), 0)
+        sender ! m.buildAppendEntryFor(msg.candidateName)
         stay() using m
       }
 
     case Event(msg: AppendSuccessful, m: StateData) =>
-      m.nextIndex.put(msg.node, m.log.lastEntryIndex + 1)
-      m.matchIndex.put(msg.node, m.log.lastEntryIndex)
-      updateCommitIndex(m)
+      m.matchIndex.put(msg.nodeName, msg.lastIndex)
+      m.nextIndex.put(msg.nodeName, m.log.lastEntryIndex + 1)
+      tryUpdateCommitIndex(m)
+      if (m.log.committedIndex > m.log.lastApplied) {
+        m.log.lastApplied = m.log.committedIndex
+        m.rebuildStorage()
+      }
       stay() using m
 
     case Event(msg: AppendRejected, m: StateData) =>
-      m.nextIndex.put(msg.node, m.nextIndex.get(msg.node).get - 1)
-      sendUpdatesTo(msg.node, m)
-      stay() using m
+      if (msg.term > m.currentTerm) {
+        goto(Follower) using m.newTerm(msg.term)
+      } else {
+        m.nextIndex.put(msg.nodeName, m.nextIndex.get(msg.nodeName).get - 1)
+        sender ! m.buildAppendEntryFor(msg.nodeName)
+        stay() using m
+      }
+
 
     case Event(msg: VoteResponse, m: StateData) =>
       //ignore
@@ -44,17 +52,14 @@ trait Leader {
 
     //client messages
 
-    case Event(msg: Ping, m : StateData) =>
+    case Event(msg: Ping, m: StateData) =>
       sender ! ClientAnswer("Pong")
       stay() using m
 
     case Event(msg: GetValue, m: StateData) =>
       log.info("get request from user")
       val data = m.storage.get(msg.key)
-      if (data.isDefined)
-        sender ! ClientAnswer(data.get, msg.answerTo)
-      else
-        sender ! ClientAnswer("EMPTY", msg.answerTo)
+      sender ! ClientAnswer(data.getOrElse("NOT_FOUND"), msg.answerTo)
       stay() using m
 
     case Event(msg: DeleteValue, m: StateData) =>
@@ -70,15 +75,12 @@ trait Leader {
 
   def sendUpdates(meta: StateData): Unit = {
     for (node <- meta.remoteNodes) {
-      if (meta.log.lastEntryIndex >= meta.nextIndex(node.name)) {
-        sendUpdatesTo(node.name, meta)
-      }
-
+      node.actor ! meta.buildAppendEntryFor(node.name)
     }
   }
 
-  def updateCommitIndex(meta: StateData) = {
-    def majorityAsBigAsN(n : Int): Boolean = {
+  def tryUpdateCommitIndex(meta: StateData) = {
+    def majorityAsBigAsN(n: Int): Boolean = {
       val sz = meta.matchIndex.values.count(_ >= n)
       sz > meta.matchIndex.size / 2
     }
@@ -86,12 +88,5 @@ trait Leader {
       if (entry.term == meta.currentTerm && majorityAsBigAsN(index) && index > meta.log.committedIndex)
         meta.log.committedIndex = index
     }
-  }
-
-  def sendUpdatesTo(nodeName: String, meta: StateData): Unit = {
-    val data = meta.log.restFrom(meta.nextIndex(nodeName))
-    val msg = new AppendEntry(meta.currentTerm, meta.self.name, meta.log.lastEntryIndex, meta.log.lastEntryTerm, data, meta.log.committedIndex)
-    val node = meta.remoteNodes.find(_.name.equals(nodeName)).head
-    node.actor ! msg
   }
 }

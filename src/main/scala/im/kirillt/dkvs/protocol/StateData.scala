@@ -21,17 +21,19 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   val matchIndex = mutable.Map[String, Int]()
   var votesForMe = 0
   var votedForOnThisTerm: Option[String] = None
+  //TODO: fix
+  val answerTo : Option[ClientMessage] = None
 
   val storage = mutable.Map[String, String]()
 
-  def updateData(meta: StateData): Unit = {
-    rebuildStorage(meta)
-    saveLog(meta)
+  def updateData(): Unit = {
+    rebuildStorage()
+    saveLog()
   }
 
-  def rebuildStorage(meta: StateData): Unit = {
+  def rebuildStorage(): Unit = {
     storage.clear()
-    for (entry <- meta.log.entries) {
+    for (entry <- log.entries) {
       (entry.key, entry.value) match {
         case (key, null) => storage.remove(key)
         case (key, value) => storage.put(key, value)
@@ -39,8 +41,8 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
     }
   }
 
-  def saveLog(meta: StateData): Unit = {
-    StateData.writeLog(meta)
+  def saveLog(): Unit = {
+    StateData.writeLog(this)
   }
 
   def newTerm(term: Int): StateData = {
@@ -58,6 +60,11 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   }
 
   def buildRequestVote() = new RequestVote(currentTerm, self.name, log.lastEntryIndex, log.lastEntryTerm)
+
+  def buildAppendEntryFor(nodeName: String) : AppendEntry = {
+    val data = log.restFrom(nextIndex(nodeName))
+    new AppendEntry(currentTerm, self.name, log.lastEntryIndex, log.lastEntryTerm, data, log.committedIndex)
+  }
 
   def becomeLeader(): StateData = {
     votedForOnThisTerm = None
@@ -88,7 +95,7 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
 
     if (log.committedIndex > log.lastApplied) {
       log.lastApplied = log.committedIndex
-      updateData(this)
+      updateData()
     }
 
     true

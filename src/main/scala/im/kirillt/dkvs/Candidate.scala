@@ -65,7 +65,7 @@ trait Candidate {
       stay() using m
 
     case Event(msg: GetValue, m: StateData) =>
-      sender ! ClientAnswer(m.storage.getOrElse(msg.key, "EMPTY"))
+      sender ! ClientAnswer(m.storage.getOrElse(msg.key, "NOT_FOUND"))
       stay() using m
 
     case Event(msg: DeleteValue, m: StateData) =>

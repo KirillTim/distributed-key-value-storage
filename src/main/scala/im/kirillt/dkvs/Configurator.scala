@@ -46,5 +46,5 @@ class Configurator(val NODE_NAME: String) {
 object Configurator {
   val electionTimeoutMin = FiniteDuration(5, SECONDS)
   val electionTimeoutMax = FiniteDuration(10, SECONDS)
-  val heartbeatTimeout = electionTimeoutMin//FiniteDuration(3, SECONDS)
+  val heartbeatTimeout = FiniteDuration(3, SECONDS)
 }
