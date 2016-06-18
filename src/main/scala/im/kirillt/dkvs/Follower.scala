@@ -8,36 +8,33 @@ trait Follower {
     case Event(ElectionTimeout, m: StateData) =>
       cancelElectionDeadline()
       m.self.actor ! BeginElection
-      goto(Candidate) using m
+      goto(Candidate) using m.nextTerm()
 
     case Event(msg: AppendEntry, m: StateData) =>
-      m.leader = Some(m.remoteNodes.find(_.name.equals(msg.leaderId)).get.actor)
-      System.err.println("Follower: get message from leader")
-      resetElectionDeadline()
-      stay() using m
-
-    case Event(msg: RequestVote, m: StateData) =>
-      if (msg.term > m.currentTerm) {
-        m.currentTerm = msg.term
-        stay() using m
+      if (m.tryToAppendEntries(msg)) {
+        val newM = m.newTerm(msg.term)
+        newM.leader = Some(self)
+        sender ! new AppendSuccessful(m.self.name, newM.currentTerm, m.log.lastEntryIndex)
+        resetElectionDeadline()
+        stay() using newM
       } else {
-        if (msg.term < m.currentTerm) {
-          sender ! DeclineCandidate(m.currentTerm)
-        } else {
-          if (m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm)) {
-            resetElectionDeadline()
-            m.voteForOnThisTerm = Some(msg.candidateName)
-            sender ! VoteForCandidate(m.currentTerm)
-            log.info("Vote for {}", msg.candidateName)
-          } else {
-            sender ! DeclineCandidate(m.currentTerm)
-            log.info("Reject candidate {]", msg.candidateName)
-          }
-        }
+        sender ! new AppendRejected(m.self.name, m.currentTerm)
         stay() using m
       }
 
-    case Event(msg: VoteResponse, m: StateData) =>
+    case Event(msg: RequestVote, m: StateData) =>
+      resetElectionDeadline()
+      if (msg.term < m.currentTerm) {
+        sender ! new DeclineCandidate(m.currentTerm)
+      } else {
+        if (m.canVoteFor(msg.lastLogIndex, msg.lastLogTerm)) {
+          m.votedForOnThisTerm = Some(msg.candidateName)
+          sender ! new VoteForCandidate(m.currentTerm)
+        }
+      }
+      stay() using m
+
+      case Event(msg: VoteResponse, m: StateData) =>
       //ignore
       stay() using m
 
@@ -45,7 +42,7 @@ trait Follower {
       msg.answerTo.get ! msg
       stay() using m
 
-    case Event(msg: Ping, m : StateData) =>
+    case Event(msg: Ping, m: StateData) =>
       sender ! ClientAnswer("Pong")
       stay() using m
 
@@ -54,7 +51,7 @@ trait Follower {
       stay() using m
 
     case Event(msg: GetValue, m: StateData) =>
-      m.leader.get ! new GetValue(msg.key, Some(sender()))
+      sender ! ClientAnswer(m.storage.getOrElse(msg.key, "NOT_FOUND"))
       stay() using m
 
     case Event(msg: DeleteValue, m: StateData) =>
