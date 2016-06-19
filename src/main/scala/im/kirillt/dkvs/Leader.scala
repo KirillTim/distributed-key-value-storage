@@ -28,11 +28,23 @@ trait Leader {
 
     case Event(msg: AppendSuccessful, m: StateData) =>
       m.matchIndex.put(msg.nodeName, msg.lastIndex)
-      m.nextIndex.put(msg.nodeName, m.log.lastEntryIndex + 1)
+      m.nextIndex.put(msg.nodeName, msg.lastIndex + 1)
+      System.err.println("Leader: prev commitindex = " + m.log.committedIndex)
       tryUpdateCommitIndex(m)
+      System.err.println("Leader: now commitindex = " + m.log.committedIndex)
       if (m.log.committedIndex > m.log.lastApplied) {
+        System.err.println("Leader: update applied index")
         m.log.lastApplied = m.log.committedIndex
-        m.rebuildStorage()
+        m.updateData()
+        System.err.println("Leader: rebuild storage")
+        if (m.answerTo.isDefined) {
+          m.answerTo.get._2 match {
+            case DeleteValue(key, answerTo) =>
+              m.answerTo.get._1 ! new ClientAnswer("DELETED", answerTo)
+            case SetValue(key, value, answerTo) =>
+              m.answerTo.get._1 ! new ClientAnswer("STORED", answerTo)
+          }
+        }
       }
       stay() using m
 
@@ -57,18 +69,23 @@ trait Leader {
       stay() using m
 
     case Event(msg: GetValue, m: StateData) =>
+      System.err.println("Leader: get message from client")
       log.info("get request from user")
       val data = m.storage.get(msg.key)
       sender ! ClientAnswer(data.getOrElse("NOT_FOUND"), msg.answerTo)
       stay() using m
 
     case Event(msg: DeleteValue, m: StateData) =>
+      System.err.println("Leader: get message from client")
       m.addEntry(msg.key, null)
+      m.answerTo = Some(sender, msg)
       sendUpdates(m)
       stay() using m
 
     case Event(msg: SetValue, m: StateData) =>
+      System.err.println("Leader: get message from client")
       m.addEntry(msg.key, msg.value)
+      m.answerTo = Some(sender, msg)
       sendUpdates(m)
       stay() using m
   }

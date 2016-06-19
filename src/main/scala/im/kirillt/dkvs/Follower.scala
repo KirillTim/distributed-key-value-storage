@@ -11,13 +11,16 @@ trait Follower {
       goto(Candidate) using m.nextTerm()
 
     case Event(msg: AppendEntry, m: StateData) =>
+      System.err.println("get AppendEntry...")
       if (m.tryToAppendEntries(msg)) {
+        System.err.println("accepted")
         val newM = m.newTerm(msg.term)
-        newM.leader = Some(self)
+        newM.leader = Some(sender)
         sender ! new AppendSuccessful(m.self.name, newM.currentTerm, m.log.lastEntryIndex)
         resetElectionDeadline()
         stay() using newM
       } else {
+        System.err.println("rejected")
         sender ! new AppendRejected(m.self.name, m.currentTerm)
         stay() using m
       }
@@ -47,14 +50,17 @@ trait Follower {
       stay() using m
 
     case Event(msg: SetValue, m: StateData) =>
+      System.err.println("Follower: get message from client")
       m.leader.get ! new SetValue(msg.key, msg.value, Some(sender()))
       stay() using m
 
     case Event(msg: GetValue, m: StateData) =>
-      sender ! ClientAnswer(m.storage.getOrElse(msg.key, "NOT_FOUND"))
+      System.err.println("Follower: get message from client")
+      sender ! new ClientAnswer(m.storage.getOrElse(msg.key, "NOT_FOUND"))
       stay() using m
 
     case Event(msg: DeleteValue, m: StateData) =>
+      System.err.println("Follower: get message from client")
       m.leader.get ! new DeleteValue(msg.key, Some(sender()))
       stay() using m
 

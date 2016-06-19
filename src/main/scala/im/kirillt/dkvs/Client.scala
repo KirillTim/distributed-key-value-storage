@@ -1,5 +1,7 @@
 package im.kirillt.dkvs
 
+import java.io.PrintWriter
+
 import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
@@ -22,9 +24,13 @@ object Client extends App {
     println(i)
   }
 
+  var log = mutable.MutableList[String]()
+
   while (true) {
     println("Enter command")
     val command = readLine().toLowerCase()
+    log += command
+    writeLog(log)
     val cmd = command.split(' ')
     if (cmd(0).equals("exit"))
       sys.exit(1)
@@ -38,6 +44,16 @@ object Client extends App {
       nodes(cmd(1)).tell(new DeleteValue(cmd(2)), clientActor)
     }
 
+  }
+
+  def writeLog(what: mutable.MutableList[String]) {
+    val filename = "client.log"
+    new PrintWriter(filename) {
+      for (i <- what) {
+        write(s"$i\n")
+      }
+      close()
+    }
   }
 }
 

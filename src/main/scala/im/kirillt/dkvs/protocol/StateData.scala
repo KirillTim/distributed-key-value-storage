@@ -22,7 +22,7 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   var votesForMe = 0
   var votedForOnThisTerm: Option[String] = None
   //TODO: fix
-  val answerTo : Option[ClientMessage] = None
+  var answerTo : Option[(ActorRef, ClientMessage)] = None
 
   val storage = mutable.Map[String, String]()
 
@@ -63,7 +63,10 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
 
   def buildAppendEntryFor(nodeName: String) : AppendEntry = {
     val data = log.restFrom(nextIndex(nodeName))
-    new AppendEntry(currentTerm, self.name, log.lastEntryIndex, log.lastEntryTerm, data, log.committedIndex)
+    var prevLogTerm = 0
+    if (matchIndex(nodeName) >= 0 && matchIndex(nodeName) < log.entries.size)
+      prevLogTerm = log.entries(matchIndex(nodeName)).term
+    new AppendEntry(currentTerm, self.name, matchIndex(nodeName), prevLogTerm, data, log.committedIndex)
   }
 
   def becomeLeader(): StateData = {
@@ -82,7 +85,7 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   def tryToAppendEntries(msg: AppendEntry): Boolean = {
     if (msg.term < currentTerm)
       return false
-    if (msg.prevLogIndex < 0 || msg.prevLogIndex > log.lastEntryIndex || log.entries(msg.prevLogIndex).term != msg.prevLogTerm)
+    if ((msg.prevLogIndex >= 0 && msg.prevLogIndex <= log.lastEntryIndex) && log.entries(msg.prevLogIndex).term != msg.prevLogTerm)
       return false
     for (newEntry <- msg.entries) {
       if (newEntry.index < log.entries.size && log.entries(newEntry.index).term != newEntry.term) {
@@ -120,6 +123,7 @@ object StateData {
       result.log.entries += entry
     }
     result.currentTerm = result.log.lastEntryTerm
+    result.rebuildStorage()
     result
   }
 
