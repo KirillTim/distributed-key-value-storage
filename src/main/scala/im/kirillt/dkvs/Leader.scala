@@ -98,7 +98,7 @@ trait Leader {
   def tryUpdateCommitIndex(meta: StateData) = {
     def majorityAsBigAsN(n: Int): Boolean = {
       val sz = meta.matchIndex.values.count(_ >= n)
-      sz > meta.matchIndex.size / 2
+      sz >= meta.matchIndex.size / 2
     }
     for ((entry, index) <- meta.log.entries.zipWithIndex) {
       if (entry.term == meta.currentTerm && majorityAsBigAsN(index) && index > meta.log.committedIndex)
