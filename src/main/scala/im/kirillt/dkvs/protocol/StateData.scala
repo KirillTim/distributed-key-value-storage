@@ -10,7 +10,9 @@ import scala.io.Source
 
 class NodeReference(val actor: ActorSelection, val name: String, var alive: Boolean = false)
 
-class Self(val actor: ActorRef, val name: String)
+case class PendingResponse(answerTo: ActorRef, msg: ClientMessage, indexInLog: Int)
+
+case class Self(actor: ActorRef, name: String)
 
 class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReference]) {
   val self = new Self(actor, name)
@@ -21,8 +23,8 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
   val matchIndex = mutable.Map[String, Int]()
   var votesForMe = 0
   var votedForOnThisTerm: Option[String] = None
-  //TODO: fix
-  var answerTo : Option[(ActorRef, ClientMessage)] = None
+  var pendingResponse: Option[PendingResponse] = None
+  var answerToClient = ""
 
   val storage = mutable.Map[String, String]()
 
@@ -35,8 +37,13 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
     storage.clear()
     for (entry <- log.entries) {
       (entry.key, entry.value) match {
-        case (key, null) => storage.remove(key)
-        case (key, value) => storage.put(key, value)
+        case (key, null) =>
+          val res = storage.remove(key)
+          if (pendingResponse.isDefined && pendingResponse.get.indexInLog == entry.index) {
+            answerToClient = if (res.isDefined) "DELETED" else "NOT_FOUND"
+          }
+        case (key, value) =>
+          storage.put(key, value)
       }
     }
   }
@@ -61,7 +68,7 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
 
   def buildRequestVote() = new RequestVote(currentTerm, self.name, log.lastEntryIndex, log.lastEntryTerm)
 
-  def buildAppendEntryFor(nodeName: String) : AppendEntry = {
+  def buildAppendEntryFor(nodeName: String): AppendEntry = {
     val data = log.restFrom(nextIndex(nodeName))
     var prevLogTerm = 0
     if (matchIndex(nodeName) >= 0 && matchIndex(nodeName) < log.entries.size)
@@ -106,6 +113,8 @@ class StateData(actor: ActorRef, name: String, val remoteNodes: Seq[NodeReferenc
 
   def addEntry(key: String, value: String): Unit = {
     log.entries += LogEntry(log.lastEntryIndex + 1, currentTerm, key, value)
+    /*for (node <- nextIndex.keys)
+      nextIndex.put(node, log.lastEntryIndex+1)*/
   }
 }
 

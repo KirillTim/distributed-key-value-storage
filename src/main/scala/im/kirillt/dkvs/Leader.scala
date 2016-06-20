@@ -37,12 +37,12 @@ trait Leader {
         m.log.lastApplied = m.log.committedIndex
         m.updateData()
         System.err.println("Leader: rebuild storage")
-        if (m.answerTo.isDefined) {
-          m.answerTo.get._2 match {
-            case DeleteValue(key, answerTo) =>
-              m.answerTo.get._1 ! new ClientAnswer("DELETED", answerTo)
-            case SetValue(key, value, answerTo) =>
-              m.answerTo.get._1 ! new ClientAnswer("STORED", answerTo)
+        if (m.pendingResponse.isDefined) {
+          m.pendingResponse.get.msg match {
+            case DeleteValue(key, client) =>
+              m.pendingResponse.get.answerTo ! new ClientAnswer(m.answerToClient, client)
+            case SetValue(key, value, client) =>
+              m.pendingResponse.get.answerTo ! new ClientAnswer("STORED", client)
           }
         }
       }
@@ -69,23 +69,22 @@ trait Leader {
       stay() using m
 
     case Event(msg: GetValue, m: StateData) =>
-      System.err.println("Leader: get message from client")
-      log.info("get request from user")
-      val data = m.storage.get(msg.key)
-      sender ! ClientAnswer(data.getOrElse("NOT_FOUND"), msg.answerTo)
+      System.err.println("Leader: get `get` message from client")
+      val value = m.storage.getOrElse(msg.key, "NOT_FOUND")
+      sender ! ClientAnswer(s"VALUE ${msg.key} $value", msg.answerTo)
       stay() using m
 
     case Event(msg: DeleteValue, m: StateData) =>
-      System.err.println("Leader: get message from client")
+      System.err.println("Leader: get `delete` message from client")
       m.addEntry(msg.key, null)
-      m.answerTo = Some(sender, msg)
+      m.pendingResponse = Some(PendingResponse(sender, msg, m.log.lastEntryIndex))
       sendUpdates(m)
       stay() using m
 
     case Event(msg: SetValue, m: StateData) =>
-      System.err.println("Leader: get message from client")
+      System.err.println("Leader: get `set` message from client")
       m.addEntry(msg.key, msg.value)
-      m.answerTo = Some(sender, msg)
+      m.pendingResponse = Some(PendingResponse(sender, msg, m.log.lastEntryIndex))
       sendUpdates(m)
       stay() using m
   }

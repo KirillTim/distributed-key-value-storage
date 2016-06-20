@@ -5,8 +5,8 @@ import scala.collection.mutable.ArrayBuffer
 case class LogEntry(index: Int, term: Int, key: String, value: String)
 
 class ReplicateLog(val entries: ArrayBuffer[LogEntry]) {
-  var lastApplied = 0
-  var committedIndex = 0
+  var lastApplied = -1
+  var committedIndex = -1
 
   def lastEntryIndex = entries.length - 1
 

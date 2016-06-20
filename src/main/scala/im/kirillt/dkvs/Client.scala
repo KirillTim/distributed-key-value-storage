@@ -2,13 +2,12 @@ package im.kirillt.dkvs
 
 import java.io.PrintWriter
 
-import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 import im.kirillt.dkvs.protocol._
-import im.kirillt.dkvs.protocol.NodeReference
 
 import scala.collection.mutable
+import scala.io.StdIn.readLine
 
 object Client extends App {
 
@@ -17,7 +16,7 @@ object Client extends App {
   val nodes = configurator.allActorsPaths
     .map(path => (path._1, system.actorSelection(path._2)))
 
-  val clientActor = system.actorOf(Props[ClientActor], "client")
+  implicit val clientActor = system.actorOf(Props[ClientActor], "client")
 
   println("Nodes:")
   for (i <- nodes.keys) {
@@ -28,22 +27,31 @@ object Client extends App {
 
   while (true) {
     println("Enter command")
-    val command = readLine().toLowerCase()
-    log += command
-    writeLog(log)
-    val cmd = command.split(' ')
-    if (cmd(0).equals("exit"))
-      sys.exit(1)
-    if (cmd(0).equals("ping")) {
-      nodes(cmd(1)).tell(new Ping(), clientActor)
-    } else if (cmd(0).equals("get")) {
-      nodes(cmd(1)).tell(new GetValue(cmd(2)), clientActor)
-    } else if (cmd(0).equals("set")) {
-      nodes(cmd(1)).tell(new SetValue(cmd(2), cmd(3)), clientActor)
-    } else if (cmd(0).equals("delete")) {
-      nodes(cmd(1)).tell(new DeleteValue(cmd(2)), clientActor)
+    try {
+      val command = readLine()
+      log += command
+      writeLog(log)
+      val cmd = command.split(' ')
+      cmd(0) = cmd(0).toLowerCase()
+      cmd(1) = cmd(1).toLowerCase()
+      cmd match {
+        case Array("exit", _) =>
+          sys.exit(1)
+        case Array("ping", node) =>
+          nodes(node) ! new Ping()
+        case Array("get", node, key) =>
+          nodes(node) ! new GetValue(key)
+        case Array("set", node, key, value) =>
+          nodes(node) ! new SetValue(key, value)
+        case Array("delete", node, key) =>
+          nodes(node) ! new DeleteValue(key)
+        case _ =>
+          println("unknown command")
+      }
+    } catch {
+      case e : Exception =>
+        println("bad command")
     }
-
   }
 
   def writeLog(what: mutable.MutableList[String]) {
